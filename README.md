@@ -6,6 +6,9 @@ Requiere tener instalado el firmware [uv-k1-k5v3-firmware-custom de armel](https
 
 ## Como instalar?
 Hay dos maneras:
-1) descargar el zip que contiene CWTX.app, luego colocarla en el filmware usando la herramienta https://armel.github.io/uvstudio/#apps 
+1) Descargar el zip que contiene CWTX.app, luego colocarla en el filmware usando la herramienta https://armel.github.io/uvstudio/#apps 
 (para usar la herrramienta de forma correcta tiene que conectar su radio con el cable de programacion mientras la radio está encendida en su modo normal,
 elegir el archivo de CWTX.app en "App file (.app)/ Chose file", elegir el slot en que lo quiere instalar y presionar "install".
+
+2) Installar el codigo .zip, renombrarlo a cwtx, colocarlo en .../uv-k1-k5v3-firmware-custom-6.0.0/App/apps/cwtx, darle permisos a build.sh y ejecutarlo, aso generará a "CWTX.app"
+luego de eso es solo hacer el paso 1.
