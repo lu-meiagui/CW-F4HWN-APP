@@ -1,8 +1,10 @@
 # CW-OVERLAY-APP
 
 ## Requisitos
-Este programa se ejecuta como una aplicación externa (Overlay App). 
-Requiere tener instalado el firmware [uv-k1-k5v3-firmware-custom de armel](https://github.com/armel/uv-k1-k5v3-firmware-custom) en su edición **Labs** para poder usarse.
+Este programa se ejecuta como una aplicación externa (Overlay App) basada en la app ["Beacon"](https://github.com/armel/uv-k1-k5v3-firmware-custom/tree/main/App/apps/beacon). 
+Requiere tener instalado el firmware [UV-K1-K5v3-firmware-custom de armel](https://github.com/armel/uv-k1-k5v3-firmware-custom) en su edición **Labs** para poder usarse.
+
+**La app fue creada y testeada para la radio quansheng UV K5 (8) con el filmware F4HWN V6.0.0, no garantizo que funcione en otros modelos de quansheng**
 
 ## Como instalar?
 Hay dos maneras:
