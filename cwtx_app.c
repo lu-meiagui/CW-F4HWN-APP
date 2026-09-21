@@ -39,8 +39,6 @@ static const uint8_t BMP_TX[16]={0x1c,0x22,0x41,0x1c,0x22,0x00,0x08,0x1c,0x1c,0x
 
 static const app_api_t *A;
 
-// ORDEN CRÍTICO: Variables pequeñas primero (offsets de 0 a 31 bytes). 
-// Los arrays grandes SIEMPRE al final para no desbordar el offset del LDRB en Thumb-16.
 static struct {
     uint16_t tapMs, fTapMs, unitMs, fHoldMs, pttHoldMs, rxRun, toneHz;
     int16_t  rxFloor, rxPeak;
@@ -324,7 +322,6 @@ __attribute__((noinline)) static void setMode(bool rx){
 
 static void handleTap(uint8_t key){
     if(G.flags & F_RX){
-        // En RX ya no hacemos nada con toques simples de PTT o F
         return; 
     }
     if(key == APP_KEY_0){
@@ -358,14 +355,13 @@ static void holdTick(void){
         if(G.fHoldMs > 0){
             if(G.fHoldMs < HOLD_MS){
                 if(G.fTapMs > 0){
-                    // ¡Doble toque de F detectado!
                     if(G.flags & F_RX) {
-                        rxReset(); // Limpia el buffer si estamos en RX
+                        rxReset(); 
                     } else {
-                        G.msgLen = 0; G.msg[0] = 0; // Limpia el buffer si estamos en TX
+                        G.msgLen = 0; G.msg[0] = 0; 
                     }
                     G.flags &= ~F_FDOWN; G.fTapMs = 0; G.lastKey = APP_KEY_INVALID; G.tapMs = 0;
-                } else { G.flags ^= F_FDOWN; G.fTapMs = 400; } // Primer toque, espera 400ms
+                } else { G.flags ^= F_FDOWN; G.fTapMs = 400; } 
                 drawAndBlit();
             }
             G.fHoldMs = 0;
