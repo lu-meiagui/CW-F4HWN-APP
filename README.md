@@ -74,55 +74,84 @@ Si todo sale bien, se generará el archivo CWTX.app. Ahora puedes instalarlo sig
 1. Características Principales:
 
 Modo Transmisión (TX): Permite redactar mensajes usando el teclado de la radio y transmitirlos en Morse con tono sidetone (TONE) o como portadora pura (CARRIER).
+
 Modo Recepción (RX): Decodifica automáticamente las señales Morse entrantes por la antena, mostrando los caracteres en pantalla en tiempo real.
+
 Velocidad Ajustable (WPM): Control en tiempo real de la velocidad de transmisión y recepción mediante los botones de navegación (UP/DOWN key).
+
 Prosignos Rápidos: Acceso directo a señales especiales (CQ, SK, AR, BT, KN, etc.) combinando la tecla F + numero.
+
 Modo Automático (Auto-repeat): Envío en bucle del mensaje guardado cada ciertos segundos para llamadas generales (CQ loop) (presionando durante 3 segundos PTT para activar o desactivar el modo).
+
 Persistencia de Configuración: Guarda automáticamente en la EEPROM de la radio tus preferencias (velocidad, tono, modo de portadora, etc.).
+
 
 2. Mapa de Controles y Atajos
 
 Botón MENU: Alterna entre el Modo Transmisión (TX) y el Modo Recepción (RX).
+
 Doble toque de la tecla F: Limpia la pantalla y borra el buffer de texto actual (funciona tanto en modo TX como en RX).
+
 Botón EXIT: Sale de la aplicación y regresa al firmware principal de la radio o cuando se transmite corta la transmision y vuelve al "menu de escritura".
 
-Controles de Velocidad y Navegación
+
+Controles de Velocidad y Navegación:
+
 Con las flechas (UP/DOWN key): Subir o bajar la velocidad de transmisión/recepción (WPM) en tiempo real (ajustando los milisegundos de la unidad del punto Morse, desde 15 ms hasta 300 ms).
 
 Funciones Especiales con la tecla F (Atajos):
 
 Al presionar una vez la tecla F y luego presionar:
+
 Tecla 0: Disminuye la frecuencia del tono local en 100 Hz (rango de 500 Hz a 1200 Hz).
+
 Tecla *: Aumenta la frecuencia del tono local en 100 Hz.
+
 
 Controles en Modo Transmisión (TX):
 
 Teclado numérico (1 al 9): Escribe letras y números mediante el sistema Multitap (pulsar varias veces la misma tecla cambia de letra, estilo antiguo de teléfono móvil).
 
-![Esquema del teclado Multitap](img/teclado.png)
+![Esquema del teclado Multitap](teclado.png)
 
 Tecla 0: Funciona como Backspace (borra el último carácter escrito).
+
 Tecla * (Asterisco): Inserta un espacio en blanco.
+
 Botón PTT (Toque corto): Inicia la transmisión del mensaje redactado por el aire.
+
 Botón PTT (Mantener presionado 1.5s): Activa o desactiva el Modo Automático (AUTO) para repetir el mensaje cíclicamente.
+
 Mantener tecla F (1.5s): Activa/Desactiva el modo de Portadora Pura (CARR) sin tono de audio interno.
+
 Prosignos: se usa F + numero, puedes configurar eso a tu gusto desde "cwtx_app.c".
+
 
 Lista de Prosignos (F + 1 al 9):
 
 F + 1:   (Espacio / Vacío — acá puedes agregar tu ID/indicativo)
+
 F + 2: SK (End of Work — Fin de contacto / Cierre)
+
 F + 3: AR (End of Message — Fin de mensaje)
+
 F + 4: BT (Break — Separador o pausa larga entre párrafos)
+
 F + 5: KN (Invite to specific station — Transmisión dirigida a una estación específica)
+
 F + 6: K (Invite to Transmit — Adelante / Responda)
+
 F + 7: CQ (Calling Any Station — Llamada general a cualquier estación)
+
 F + 8: DE (From — De parte de)
+
 F + 9: 73 (Saludos cordiales / Mejores deseos)
+
 
 Controles en Modo Recepción (RX):
 
 Visualización en vivo: Muestra una barra de estado con el RSSI (intensidad de señal) y los puntos/rayas (. y -) que la radio va detectando antes de convertirlos en letras.
+
 Alertas automáticas: La radio emite un pitido o destella el LED si detecta prosignos comunes como CQ o tu ID puesto en F + 1 en una transmisión.
 
 
