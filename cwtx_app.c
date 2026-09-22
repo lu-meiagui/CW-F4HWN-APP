@@ -36,12 +36,11 @@ static const uint8_t M_DIG[10]={0x3F,0x2F,0x27,0x23,0x21,0x20,0x30,0x38,0x3C,0x3
 static const char KEYMAP_FLAT[]="\0""1.0/""\0""ABC2""\0""DEF3""\0""GHI4""\0""JKL5""\0""MNO6""\0""PQRS7""\0""TUV8""\0""WXYZ9";
 static const char PROSIGN_FLAT[]=" \0""SK\0""AR\0""BT\0""KN\0""K\0""CQ\0""DE\0""73";
 static const uint8_t BMP_TX[16]={0x1c,0x22,0x41,0x1c,0x22,0x00,0x08,0x1c,0x1c,0x08,0x00,0x22,0x1c,0x41,0x22,0x1c};
-
 static const app_api_t *A;
 
 static struct {
     uint16_t tapMs, fTapMs, unitMs, fHoldMs, pttHoldMs, rxRun, toneHz;
-    int16_t  rxFloor, rxPeak;
+    int16_t  rxFloor, rxPeak, smooth_rssi;
     uint8_t  flags, msgLen, rxLen, lastKey, tapIdx, prevKey, rxCode, rxAdapt, batTimer, txPauseAt;
     bool     txPaused;
     char     msg[MSG_MAX+1];
@@ -95,7 +94,7 @@ static char morseChar(uint8_t code){
     return '?';
 }
 
-__attribute__((noinline)) static void beepAlert(uint16_t ms){
+static void beepAlert(uint16_t ms){
     A->set_af(AF_BEEP); A->audio_path(true);
     A->tx_tone(800); A->tx_mute(false);
     A->delay_ms(ms);
@@ -111,7 +110,7 @@ static bool rxEndsWith(const char *s, uint8_t n){
 static void rxCheckAlert(void){
     const char *id = getFlatStr(PROSIGN_FLAT, 0);
     uint8_t idLen = 0;
-    while(id[idLen] && id[idLen] != ' ') idLen++;
+    while(id[idLen]) idLen++;
     if(idLen > 0 && rxEndsWith(id, idLen)){
         for(uint8_t i=0; i<3; i++){ A->led(true); beepAlert(80); A->led(false); A->delay_ms(80); }
         return;
@@ -121,11 +120,11 @@ static void rxCheckAlert(void){
     }
 }
 
-__attribute__((noinline)) static void blitAll(void){ 
+static void blitAll(void){ 
     A->blit_status(); A->blit_full(); 
 }
 
-__attribute__((noinline)) static void chrome(void){
+static void chrome(void){
     char b[24], *p;
     A->display_clear(); A->status_clear();
     A->print_inverse((G.flags & F_RX) ? "CW RX" : "CW TX", 2, 0, true, true, 24);
@@ -135,13 +134,13 @@ __attribute__((noinline)) static void chrome(void){
     A->print_normal(b, (uint8_t)(126 - (p - b) * 7), 0, 6);
 }
 
-__attribute__((noinline)) static void drawText(const char *s, uint8_t len){
+static void drawText(const char *s, uint8_t len){
     char b[17];
     for(int r = 0; r < 4; r++){
         int n = 0;
-        for(int i = r * 16; i < (r * 16 + 16) && i < (int)len; i++) b[n++] = s[i];
+        for(int i = r * 16; i < (r * 16 + 16) && i < len; i++) b[n++] = s[i];
         b[n] = 0;
-        if(n) A->print_normal(b, 0, 127, (uint8_t)(r + 1));
+        if(n) A->print_normal(b, 0, 127, r + 1);
         if(n < 16) break;
     }
 }
@@ -160,23 +159,29 @@ static void draw(void){
     } else {
         drawText(G.msg, G.msgLen);
     }
-    p = pstr(b, "WPM "); p = pnum(p, udiv(1200u, G.unitMs, NULL), 1);
-    if(!(G.flags & F_RX)){ *p++ = ' '; p = pnum(p, G.msgLen, 1); *p++ = '/'; p = pnum(p, MSG_MAX, 1); }
-    if(G.flags & F_CARR){ p = pstr(p, " CARR"); }
-    else{ *p++ = ' '; p = pnum(p, G.toneHz, 1); p = pstr(p, "Hz"); }
-    if(G.flags & F_AUTO) p = pstr(p, " AUTO");
+    
+    if(G.txPaused && G.txPauseAt < G.msgLen){
+        p = pstr(b, "PAUSE "); p = pnum(p, G.txPauseAt + 1, 1);
+        *p++ = '/'; p = pnum(p, G.msgLen, 1);
+    } else {
+        p = pstr(b, "WPM "); p = pnum(p, udiv(1200u, G.unitMs, NULL), 1);
+        if(!(G.flags & F_RX)){ *p++ = ' '; p = pnum(p, G.msgLen, 1); *p++ = '/'; p = pnum(p, MSG_MAX, 1); }
+        if(G.flags & F_CARR){ p = pstr(p, " CARR"); }
+        else{ *p++ = ' '; p = pnum(p, G.toneHz, 1); p = pstr(p, "Hz"); }
+        if(G.flags & F_AUTO) p = pstr(p, " AUTO");
+    }
     A->print_normal(b, 2, 0, 5);
 }
 
-__attribute__((noinline)) static void drawAndBlit(void){ draw(); blitAll(); }
+static void drawAndBlit(void){ draw(); blitAll(); }
 
-__attribute__((noinline)) static void keyOn(void){
+static void keyOn(void){
     A->tx_carrier(true);
     if(G.flags & F_CARR){ A->tx_tone(G.toneHz); A->set_af(AF_BEEP); A->audio_path(true); }
     A->tx_mute(false);
 }
 
-__attribute__((noinline)) static void keyOff(void){
+static void keyOff(void){
     A->tx_mute(true);
     if(G.flags & F_CARR) A->tx_carrier(false);
 }
@@ -187,7 +192,9 @@ static uint8_t sendDelay(uint16_t ms, bool anyKeyStops){
         A->delay_ms(sl); ms -= sl;
         A->backlight_update();
         uint8_t k = A->get_key();
+        
         if(k == APP_KEY_EXIT) return 1;
+        if(k == APP_KEY_PTT && !anyKeyStops) { G.txPaused = true; return 1; }
         if(anyKeyStops && k != APP_KEY_INVALID) return 2;
     }
     return 0;
@@ -207,12 +214,8 @@ static bool sendChar(char c){
     return sendDelay((uint16_t)(G.unitMs * 2u), false) != 0;
 }
 
-__attribute__((noinline)) static void drainKeys(void){
-    int idle = 0, guard = 0;
-    while(idle < 4 && guard < 250){
-        idle = (A->get_key() == APP_KEY_INVALID) ? (idle + 1) : 0;
-        A->delay_ms(10); A->backlight_update(); guard++;
-    }
+static void drainKeys(void){
+    while(A->get_key() != APP_KEY_INVALID) A->delay_ms(10);
     G.prevKey = APP_KEY_INVALID;
 }
 
@@ -222,23 +225,33 @@ static bool sendOnce(void){
     for(int i = 0; i < 16; i++) A->status_line[48 + i] = BMP_TX[i];
     drawText(G.msg, G.msgLen);
     blitAll();
+    
     A->tx_set_params();
     A->tx_tone(G.toneHz); A->set_af(AF_BEEP); A->audio_path(true); A->tx_mute(true);
     bool aborted = false;
     
+    G.txPaused = false;
+
     for(uint8_t i = G.txPauseAt; i < G.msgLen; i++){
-        if(A->get_key() == APP_KEY_PTT){
-            G.txPaused = true; G.txPauseAt = i;
-            aborted = true;
-        }
-        p = pstr(b, G.txPaused ? "PAUSE " : "TX "); p = pnum(p, i + 1, 1);
+        p = pstr(b, "TX "); p = pnum(p, i + 1, 1);
         *p++ = '/'; p = pnum(p, G.msgLen, 1);
         A->print_string(b, 0, 127, 5, 8);
         blitAll();
         
-        if(G.txPaused){ drainKeys(); break; }
-        if(sendChar(G.msg[i])){ aborted = true; break; }
+        if(sendChar(G.msg[i])){
+            aborted = true;
+            if(G.txPaused) G.txPauseAt = i;
+            break; 
+        }
     }
+    
+    if(G.txPaused){
+        p = pstr(b, "PAUSE "); p = pnum(p, G.txPauseAt + 1, 1);
+        *p++ = '/'; p = pnum(p, G.msgLen, 1);
+        A->print_string(b, 0, 127, 5, 8);
+        blitAll();
+    }
+    
     keyOff(); A->audio_path(false); A->tx_end();
     if(!G.txPaused) G.txPauseAt = 0;
     return !aborted;
@@ -246,23 +259,17 @@ static bool sendOnce(void){
 
 static void sendMessage(void){
     if(G.msgLen == 0) return;
-    if(A->tx_state() != 0){
-        chrome(); A->print_string("TX OFF", 0, 127, 3, 8);
-        blitAll();
-        for(int i = 0; i < 20; i++){ A->delay_ms(TICK_MS); A->backlight_update(); }
-        drainKeys(); return;
-    }
     if(!G.txPaused) G.txPauseAt = 0;
     bool ok = sendOnce();
+    drainKeys(); 
     if(G.txPaused) return;
-    drainKeys();
     
     while(ok && (G.flags & F_AUTO) && (G.flags & F_RUN)){
         uint8_t r = sendDelay(REPEAT_MS, true);
-        if(r == 1){ G.flags &= ~F_RUN; break; }
+        if(r == 1){ G.flags &= ~F_AUTO; drainKeys(); drawAndBlit(); break; }
         if(r == 2) break;
-        if(A->tx_state() != 0) break;
-        G.txPauseAt = 0; ok = sendOnce(); drainKeys();
+        G.txPauseAt = 0; G.txPaused = false; ok = sendOnce(); drainKeys();
+        if(G.txPaused) return;
     }
 }
 
@@ -280,14 +287,18 @@ static void rxFlush(void){
     if(G.flags & F_PEND){ rxPush(morseChar(G.rxCode)); G.rxCode = 1; G.flags &= ~F_PEND; }
 }
 
-__attribute__((noinline)) static void rxReset(void){
+static void rxReset(void){
     G.rxLen = 0; G.rxBuf[0] = 0; G.rxCode = 1;
     G.flags &= ~(F_PEND | F_MARK);
     G.rxRun = 0; G.rxAdapt = 0; G.rxFloor = -130; G.rxPeak = -120;
+    G.smooth_rssi = -130;
 }
 
 static void rxSample(void){
-    int16_t r = A->rssi_dbm();
+    int16_t raw = A->rssi_dbm();
+    G.smooth_rssi = (int16_t)(G.smooth_rssi + ((raw - G.smooth_rssi) >> 1));
+    int16_t r = G.smooth_rssi;
+
     if(r < G.rxFloor) G.rxFloor = r;
     if(r > G.rxPeak) G.rxPeak = r;
     if(++G.rxAdapt >= 16){
@@ -295,16 +306,30 @@ static void rxSample(void){
         if(G.rxFloor < r) G.rxFloor++;
         if(G.rxPeak > r) G.rxPeak--;
     }
-    if(G.rxPeak < (int16_t)(G.rxFloor + 8)) G.rxPeak = (int16_t)(G.rxFloor + 8);
-    bool mark = (r > (int16_t)((G.rxFloor + G.rxPeak) >> 1));
-    if(mark == ((G.flags & F_MARK) != 0)){
+    
+    if(G.rxPeak < (int16_t)(G.rxFloor + 14)) G.rxPeak = (int16_t)(G.rxFloor + 14);
+
+    int16_t range = G.rxPeak - G.rxFloor;
+    int16_t third = (int16_t)udiv((uint32_t)range, 3u, NULL);
+    int16_t th_high = G.rxFloor + (third << 1); 
+    int16_t th_low = G.rxFloor + third;         
+
+    bool curr_mark = ((G.flags & F_MARK) != 0);
+    bool mark = curr_mark;
+
+    if (!curr_mark && r > th_high) mark = true;
+    else if (curr_mark && r < th_low) mark = false;
+
+    if(mark == curr_mark){
         if(G.rxRun < 60000u) G.rxRun += RX_TICK;
         else if(G.flags & F_PEND) rxFlush();
         return;
     }
+
     A->led(mark);
     uint16_t d = G.rxRun; G.rxRun = 0;
-    if(G.flags & F_MARK){
+    
+    if(curr_mark){
         G.rxCode = (uint8_t)((G.rxCode << 1) | ((d >= (uint16_t)(G.unitMs * 2u)) ? 1u : 0u));
         G.flags |= F_PEND;
         if(G.rxCode > 0x7F){ rxPush('?'); G.rxCode = 1; G.flags &= ~F_PEND; }
@@ -312,26 +337,27 @@ static void rxSample(void){
         if(d >= (uint16_t)(G.unitMs * 5u)){ rxFlush(); rxPush(' '); }
         else if(d >= (uint16_t)(G.unitMs * 2u)) rxFlush();
     }
+    
     if(mark) G.flags |= F_MARK; else G.flags &= ~F_MARK;
 }
 
-__attribute__((noinline)) static void setMode(bool rx){
+static void setMode(bool rx){
     if(rx){ G.flags |= F_RX; rxReset(); A->set_af(APP_AF_FM); A->audio_path(true); }
     else{ G.flags &= ~F_RX; A->audio_path(false); A->led(false); }
 }
 
 static void handleTap(uint8_t key){
-    if(G.flags & F_RX){
-        return; 
-    }
+    if(G.flags & F_RX) return; 
+    if(key == APP_KEY_PTT){ sendMessage(); return; }
+    
+    G.txPaused = false; G.txPauseAt = 0;
+    
     if(key == APP_KEY_0){
         if(G.msgLen > 0) G.msg[--G.msgLen] = 0;
         G.lastKey = APP_KEY_INVALID; G.tapMs = 0;
     } else if(key == APP_KEY_STAR){
         if(G.msgLen < MSG_MAX){ G.msg[G.msgLen++] = ' '; G.msg[G.msgLen] = 0; }
         G.lastKey = APP_KEY_INVALID; G.tapMs = 0;
-    } else if(key == APP_KEY_PTT){
-        sendMessage();
     } else if(key <= APP_KEY_9){
         const char *set = getFlatStr(KEYMAP_FLAT, key);
         if(set[0]){
@@ -355,11 +381,7 @@ static void holdTick(void){
         if(G.fHoldMs > 0){
             if(G.fHoldMs < HOLD_MS){
                 if(G.fTapMs > 0){
-                    if(G.flags & F_RX) {
-                        rxReset(); 
-                    } else {
-                        G.msgLen = 0; G.msg[0] = 0; 
-                    }
+                    if(G.flags & F_RX) rxReset(); else { G.msgLen = 0; G.msg[0] = 0; }
                     G.flags &= ~F_FDOWN; G.fTapMs = 0; G.lastKey = APP_KEY_INVALID; G.tapMs = 0;
                 } else { G.flags ^= F_FDOWN; G.fTapMs = 400; } 
                 drawAndBlit();
@@ -418,6 +440,10 @@ void app_main(const app_api_t *api){
         uint8_t key = A->get_key();
 
         if(key == APP_KEY_EXIT && key != G.prevKey){
+            if(G.txPaused){
+                G.txPaused = false; G.txPauseAt = 0;
+                G.prevKey = key; drawAndBlit(); continue;
+            }
             G.flags &= ~F_RUN; G.prevKey = key; continue;
         }
 
